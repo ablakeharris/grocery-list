@@ -4,7 +4,7 @@ services:
     image: grocery-list:latest
     container_name: grocery-list
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - grocery-data:/data
     restart: unless-stopped

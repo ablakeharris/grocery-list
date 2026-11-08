@@ -24,7 +24,7 @@ git clone <this repo> grocery-list && cd grocery-list
 docker compose up -d --build
 ```
 
-Open `http://<pi-ip-address>:3000` from any device on your network.
+Open `http://<pi-ip-address>:3001` from any device on your network.
 
 ### Option B: build on your computer, copy to the Pi
 
@@ -85,7 +85,7 @@ ssh pi@<pi-ip> 'docker cp ~/foods.db grocery-list:/data/foods.db'
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000, database at ./data/grocery.db
+npm run dev        # http://localhost:3001, database at ./data/grocery.db
 npm run import-foods  # build ./data/foods.db from ./food.parquet (see above)
 npm run typecheck  # TypeScript 7 (tsc)
 npm run lint       # ESLint

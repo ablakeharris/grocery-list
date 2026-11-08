@@ -22,7 +22,7 @@ FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000 \
+    PORT=3001 \
     HOSTNAME=0.0.0.0 \
     DATABASE_PATH=/data/grocery.db \
     FOODS_DATABASE_PATH=/data/foods.db
@@ -36,9 +36,9 @@ COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
 USER node
 VOLUME ["/data"]
-EXPOSE 3000
+EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
 
 CMD ["node", "server.js"]
