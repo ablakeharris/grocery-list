@@ -1,8 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { getDb, transaction } from "./db";
 import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "./categories";
-import type { ClearScope, ItemCreate, ItemUpdate } from "./schema";
-import type { Item, List, ListSummary } from "./types";
+import type {
+  ClearScope,
+  IngredientCreate,
+  IngredientUpdate,
+  ItemCreate,
+  ItemUpdate,
+} from "./schema";
+import type {
+  AddMealResult,
+  Ingredient,
+  Item,
+  List,
+  ListSummary,
+  Meal,
+  MealSummary,
+} from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -191,4 +205,250 @@ export function clearItems(listId: string, scope: ClearScope): number {
     touchList(listId);
     return Number(result.changes);
   });
+}
+
+// ---- Meals ----
+
+const MAX_QUANTITY = 999;
+
+function toMeal(row: Row): Meal {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
+function toIngredient(row: Row): Ingredient {
+  return {
+    id: String(row.id),
+    mealId: String(row.meal_id),
+    name: String(row.name),
+    quantity: Number(row.quantity),
+    priceCents: row.price_cents === null ? null : Number(row.price_cents),
+    category: toCategory(row.category),
+    createdAt: String(row.created_at),
+  };
+}
+
+function touchMeal(mealId: string) {
+  getDb()
+    .prepare("UPDATE meals SET updated_at = ? WHERE id = ?")
+    .run(nowIso(), mealId);
+}
+
+export function getMealSummaries(): MealSummary[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT m.*,
+              COUNT(g.id)                                  AS ingredient_count,
+              COALESCE(SUM(g.quantity * g.price_cents), 0) AS total_cents
+         FROM meals m
+         LEFT JOIN meal_ingredients g ON g.meal_id = m.id
+        GROUP BY m.id
+        ORDER BY m.name COLLATE NOCASE`,
+    )
+    .all() as Row[];
+
+  return rows.map((row) => ({
+    ...toMeal(row),
+    ingredientCount: Number(row.ingredient_count),
+    totalCents: Number(row.total_cents),
+  }));
+}
+
+export function getMeal(id: string): Meal | null {
+  const row = getDb().prepare("SELECT * FROM meals WHERE id = ?").get(id) as
+    | Row
+    | undefined;
+  return row ? toMeal(row) : null;
+}
+
+export function createMeal(name: string): Meal {
+  const id = randomUUID();
+  const now = nowIso();
+  getDb()
+    .prepare(
+      "INSERT INTO meals (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+    )
+    .run(id, name, now, now);
+  return getMeal(id)!;
+}
+
+export function renameMeal(id: string, name: string): Meal | null {
+  getDb()
+    .prepare("UPDATE meals SET name = ?, updated_at = ? WHERE id = ?")
+    .run(name, nowIso(), id);
+  return getMeal(id);
+}
+
+export function deleteMeal(id: string): boolean {
+  const result = getDb().prepare("DELETE FROM meals WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
+// ---- Ingredients ----
+
+export function getIngredients(mealId: string): Ingredient[] {
+  const rows = getDb()
+    .prepare(
+      "SELECT * FROM meal_ingredients WHERE meal_id = ? ORDER BY created_at, rowid",
+    )
+    .all(mealId) as Row[];
+  return rows.map(toIngredient);
+}
+
+export function getIngredient(id: string): Ingredient | null {
+  const row = getDb()
+    .prepare("SELECT * FROM meal_ingredients WHERE id = ?")
+    .get(id) as Row | undefined;
+  return row ? toIngredient(row) : null;
+}
+
+export function createIngredient(mealId: string, input: IngredientCreate): Ingredient {
+  const id = randomUUID();
+  transaction(getDb(), () => {
+    getDb()
+      .prepare(
+        `INSERT INTO meal_ingredients (id, meal_id, name, quantity, price_cents, category, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        id,
+        mealId,
+        input.name,
+        input.quantity,
+        input.priceCents,
+        input.category,
+        nowIso(),
+      );
+    touchMeal(mealId);
+  });
+  return getIngredient(id)!;
+}
+
+const INGREDIENT_COLUMNS = {
+  name: "name",
+  quantity: "quantity",
+  priceCents: "price_cents",
+  category: "category",
+} as const satisfies Record<keyof IngredientUpdate, string>;
+
+export function updateIngredient(
+  id: string,
+  patch: IngredientUpdate,
+): Ingredient | null {
+  const existing = getIngredient(id);
+  if (!existing) return null;
+
+  const sets: string[] = [];
+  const values: (string | number | null)[] = [];
+  for (const key of Object.keys(INGREDIENT_COLUMNS) as (keyof IngredientUpdate)[]) {
+    const value = patch[key];
+    if (value === undefined) continue;
+    sets.push(`${INGREDIENT_COLUMNS[key]} = ?`);
+    values.push(value);
+  }
+  if (sets.length === 0) return existing;
+
+  transaction(getDb(), () => {
+    getDb()
+      .prepare(`UPDATE meal_ingredients SET ${sets.join(", ")} WHERE id = ?`)
+      .run(...values, id);
+    touchMeal(existing.mealId);
+  });
+  return getIngredient(id);
+}
+
+export function deleteIngredient(id: string): boolean {
+  const existing = getIngredient(id);
+  if (!existing) return false;
+  transaction(getDb(), () => {
+    getDb().prepare("DELETE FROM meal_ingredients WHERE id = ?").run(id);
+    touchMeal(existing.mealId);
+  });
+  return true;
+}
+
+// ---- Adding a meal to a list ----
+
+function nameKey(name: string) {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * Copies a meal's ingredients onto a list, `times` batches over. An ingredient
+ * that's already on the list and not yet bought gets its quantity bumped
+ * instead of a duplicate row, so two meals that both need onions give one
+ * "Onions x2". Returns null when the meal doesn't exist.
+ */
+export function addMealToList(
+  listId: string,
+  mealId: string,
+  times = 1,
+): AddMealResult | null {
+  if (!getMeal(mealId)) return null;
+  const ingredients = getIngredients(mealId);
+  const db = getDb();
+
+  let added = 0;
+  let merged = 0;
+  transaction(db, () => {
+    const open = new Map<string, Item>();
+    for (const item of getItems(listId)) {
+      if (!item.checked && !open.has(nameKey(item.name))) {
+        open.set(nameKey(item.name), item);
+      }
+    }
+
+    const bump = db.prepare(
+      "UPDATE items SET quantity = ?, price_cents = COALESCE(price_cents, ?), is_sample = 0 WHERE id = ?",
+    );
+    const insert = db.prepare(
+      `INSERT INTO items (id, list_id, name, quantity, price_cents, category, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const base = Date.now();
+    const createdIds = new Set<string>();
+
+    ingredients.forEach((ing, i) => {
+      const qty = ing.quantity * times;
+      const existing = open.get(nameKey(ing.name));
+      if (existing) {
+        existing.quantity = Math.min(MAX_QUANTITY, existing.quantity + qty);
+        bump.run(existing.quantity, ing.priceCents, existing.id);
+        if (!createdIds.has(existing.id)) merged++;
+      } else {
+        const item: Item = {
+          id: randomUUID(),
+          listId,
+          name: ing.name,
+          quantity: Math.min(MAX_QUANTITY, qty),
+          priceCents: ing.priceCents,
+          category: ing.category,
+          checked: false,
+          isSample: false,
+          // Stagger timestamps so items keep the meal's order.
+          createdAt: new Date(base + i).toISOString(),
+        };
+        insert.run(
+          item.id,
+          listId,
+          item.name,
+          item.quantity,
+          item.priceCents,
+          item.category,
+          item.createdAt,
+        );
+        // A meal that lists the same thing twice merges into one row.
+        open.set(nameKey(item.name), item);
+        createdIds.add(item.id);
+        added++;
+      }
+    });
+    touchList(listId);
+  });
+
+  return { added, merged, items: getItems(listId) };
 }

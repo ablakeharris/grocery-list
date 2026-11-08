@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Pencil, Printer, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Printer, Share2, Trash2, UtensilsCrossed } from "lucide-react";
 import { api, ApiError } from "@/lib/client-api";
 import { formatCents, lineTotalCents } from "@/lib/format";
 import type { ItemCreate, ItemUpdate } from "@/lib/schema";
 import { groupByCategory, listToText, shareText } from "@/lib/share";
-import type { Item, List } from "@/lib/types";
+import type { Item, List, MealSummary } from "@/lib/types";
 import { IconButton } from "./icon-button";
 import { fieldClass, ItemForm } from "./item-form";
 import { ItemRow } from "./item-row";
+import { MealPicker } from "./meal-picker";
 import { useLiveRefresh } from "./use-live-refresh";
 import { useToast } from "./toast";
 
@@ -21,6 +22,7 @@ export function ListView({ initialList, initialItems }: Props) {
   const [items, setItems] = useState(initialItems);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
+  const [pickingMeal, setPickingMeal] = useState(false);
   const [gone, setGone] = useState(false);
   const { toast, showToast } = useToast();
   // Skip background refreshes while our own changes are in flight,
@@ -85,6 +87,20 @@ export function ListView({ initialList, initialItems }: Props) {
     void mutate(
       (prev) => prev.filter((i) => i.id !== id),
       () => api.deleteItem(id),
+    );
+  }
+
+  function addMeal(meal: MealSummary) {
+    void mutate(
+      (prev) => prev,
+      async () => {
+        const result = await api.addMealToList(list.id, meal.id);
+        setItems(result.items);
+        const parts = [];
+        if (result.added) parts.push(`${result.added} new`);
+        if (result.merged) parts.push(`${result.merged} already on list`);
+        showToast(`Added ${meal.name}${parts.length ? ` (${parts.join(", ")})` : ""}`);
+      },
     );
   }
 
@@ -183,6 +199,14 @@ export function ListView({ initialList, initialItems }: Props) {
             </button>
           )}
           <div className="flex shrink-0 gap-0.5 print:hidden">
+            <IconButton
+              label="Add a meal"
+              onClick={() => setPickingMeal((open) => !open)}
+              aria-expanded={pickingMeal}
+              className={pickingMeal ? "bg-soft text-ink" : ""}
+            >
+              <UtensilsCrossed aria-hidden className="size-[18px]" />
+            </IconButton>
             <IconButton label="Share list" onClick={share}>
               <Share2 aria-hidden className="size-[18px]" />
             </IconButton>
@@ -207,6 +231,10 @@ export function ListView({ initialList, initialItems }: Props) {
         <div className="print:hidden">
           <ItemForm onSubmit={addItem} />
         </div>
+
+        {pickingMeal && (
+          <MealPicker onAdd={addMeal} onClose={() => setPickingMeal(false)} />
+        )}
 
         {hasSample && (
           <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-soft px-4 py-2.5 text-sm print:hidden">

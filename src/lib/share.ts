@@ -1,8 +1,8 @@
-import { CATEGORIES } from "./categories";
+import { CATEGORIES, type Category } from "./categories";
 import { formatCents, lineTotalCents } from "./format";
 import type { Item } from "./types";
 
-export function groupByCategory(items: Item[]) {
+export function groupByCategory<T extends { category: Category }>(items: T[]) {
   return CATEGORIES.map((category) => ({
     category,
     items: items.filter((i) => i.category === category),

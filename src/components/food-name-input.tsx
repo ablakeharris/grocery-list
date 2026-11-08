@@ -13,10 +13,18 @@ type Props = {
   onPick: (product: FoodSuggestion) => void;
   className: string;
   autoFocus?: boolean;
+  placeholder?: string;
 };
 
 /** Item name field that suggests products from the food catalog as you type. */
-export function FoodNameInput({ value, onChange, onPick, className, autoFocus }: Props) {
+export function FoodNameInput({
+  value,
+  onChange,
+  onPick,
+  className,
+  autoFocus,
+  placeholder = "Add an item...",
+}: Props) {
   const [suggestions, setSuggestions] = useState<FoodSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -100,7 +108,7 @@ export function FoodNameInput({ value, onChange, onPick, className, autoFocus }:
     <div className="relative">
       <input
         className={`${className} w-full`}
-        placeholder="Add an item..."
+        placeholder={placeholder}
         aria-label="Item name"
         role="combobox"
         aria-autocomplete="list"

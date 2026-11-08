@@ -63,6 +63,30 @@ const MIGRATIONS: ((db: DatabaseSync) => void)[] = [
     `);
     seedSample(db);
   },
+  (db) => {
+    // A meal is a reusable set of ingredients. Each ingredient has the same
+    // fields as a list item, so adding a meal to a list copies them in.
+    db.exec(`
+      CREATE TABLE meals (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE meal_ingredients (
+        id           TEXT PRIMARY KEY,
+        meal_id      TEXT NOT NULL REFERENCES meals(id) ON DELETE CASCADE,
+        name         TEXT NOT NULL,
+        quantity     INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        price_cents  INTEGER CHECK (price_cents IS NULL OR price_cents >= 0),
+        category     TEXT NOT NULL DEFAULT 'Other',
+        created_at   TEXT NOT NULL
+      );
+
+      CREATE INDEX meal_ingredients_meal_id ON meal_ingredients(meal_id);
+    `);
+  },
 ];
 
 function migrate(db: DatabaseSync) {

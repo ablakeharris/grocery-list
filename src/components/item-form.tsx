@@ -14,6 +14,7 @@ type Props = {
   initial?: ItemCreate;
   submitLabel?: string;
   autoFocus?: boolean;
+  placeholder?: string;
   onSubmit: (input: ItemCreate) => void;
   onCancel?: () => void;
 };
@@ -22,6 +23,7 @@ export function ItemForm({
   initial,
   submitLabel = "Add",
   autoFocus,
+  placeholder,
   onSubmit,
   onCancel,
 }: Props) {
@@ -63,6 +65,7 @@ export function ItemForm({
         className={fieldClass}
         value={name}
         autoFocus={autoFocus}
+        placeholder={placeholder}
         onChange={setName}
         onPick={(product) => {
           setName(productLabel(product));

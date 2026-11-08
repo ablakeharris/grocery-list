@@ -1,5 +1,20 @@
-import type { ClearScope, ItemCreate, ItemUpdate } from "./schema";
-import type { FoodSuggestion, Item, List, ListSummary } from "./types";
+import type {
+  ClearScope,
+  IngredientCreate,
+  IngredientUpdate,
+  ItemCreate,
+  ItemUpdate,
+} from "./schema";
+import type {
+  AddMealResult,
+  FoodSuggestion,
+  Ingredient,
+  Item,
+  List,
+  ListSummary,
+  Meal,
+  MealSummary,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -48,6 +63,25 @@ export const api = {
     request<{ deleted: number }>(`/api/lists/${listId}/items?scope=${scope}`, {
       method: "DELETE",
     }),
+
+  meals: () => request<MealSummary[]>("/api/meals"),
+  createMeal: (name: string) => request<Meal>("/api/meals", json("POST", { name })),
+  renameMeal: (id: string, name: string) =>
+    request<Meal>(`/api/meals/${id}`, json("PATCH", { name })),
+  deleteMeal: (id: string) =>
+    request<void>(`/api/meals/${id}`, { method: "DELETE" }),
+  mealWithIngredients: (id: string) =>
+    request<{ meal: Meal; ingredients: Ingredient[] }>(`/api/meals/${id}`),
+
+  createIngredient: (mealId: string, input: IngredientCreate) =>
+    request<Ingredient>(`/api/meals/${mealId}/ingredients`, json("POST", input)),
+  updateIngredient: (id: string, patch: IngredientUpdate) =>
+    request<Ingredient>(`/api/ingredients/${id}`, json("PATCH", patch)),
+  deleteIngredient: (id: string) =>
+    request<void>(`/api/ingredients/${id}`, { method: "DELETE" }),
+
+  addMealToList: (listId: string, mealId: string, times = 1) =>
+    request<AddMealResult>(`/api/lists/${listId}/meals`, json("POST", { mealId, times })),
 
   searchFoods: (q: string, signal?: AbortSignal) =>
     request<FoodSuggestion[]>(`/api/foods?q=${encodeURIComponent(q)}`, { signal }),

@@ -6,6 +6,7 @@ A small self-hosted app for shared grocery lists, built to run on a Raspberry Pi
 - Tap the checkbox to mark an item bought (it stays in place, crossed out)
 - Tap an item's name to edit it; tap the list title to rename the list
 - Product suggestions while typing an item name, from the [Open Food Facts](https://world.openfoodfacts.org) database (optional, see below)
+- Meals: save the ingredients for meals you make often, then add a meal to a list from the list page (the fork-and-knife button). Ingredients already on the list, and not yet checked off, get their quantity bumped instead of being added twice; add a meal twice to double it
 - Share (phone share sheet or copy to clipboard), print, clear checked, clear all
 - Open devices refresh every 10 seconds and when the tab regains focus
 - No login: anyone on your network can use it
