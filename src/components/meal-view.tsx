@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, CopyPlus, Pencil, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/client-api";
 import { formatCents, lineTotalCents } from "@/lib/format";
 import type { IngredientCreate, IngredientUpdate } from "@/lib/schema";
@@ -24,6 +24,7 @@ export function MealView({ initialMeal, initialIngredients }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [gone, setGone] = useState(false);
+  const [copying, setCopying] = useState(false);
   const { toast, showToast } = useToast();
   // Skip background refreshes while our own changes are in flight.
   const pending = useRef(0);
@@ -103,6 +104,17 @@ export function MealView({ initialMeal, initialIngredients }: Props) {
     }
   }
 
+  async function copy() {
+    setCopying(true);
+    try {
+      const copied = await api.copyMeal(meal.id);
+      router.push(`/meals/${copied.id}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't copy meal");
+      setCopying(false);
+    }
+  }
+
   async function remove() {
     if (!confirm(`Delete the "${meal.name}" meal? Your lists stay as they are.`)) return;
     try {
@@ -165,9 +177,14 @@ export function MealView({ initialMeal, initialIngredients }: Props) {
               />
             </button>
           )}
-          <IconButton label="Delete meal" onClick={remove}>
-            <Trash2 aria-hidden className="size-[18px]" />
-          </IconButton>
+          <div className="flex shrink-0 gap-0.5">
+            <IconButton label="Make a copy" onClick={copy} disabled={copying}>
+              <CopyPlus aria-hidden className="size-[18px]" />
+            </IconButton>
+            <IconButton label="Delete meal" onClick={remove}>
+              <Trash2 aria-hidden className="size-[18px]" />
+            </IconButton>
+          </div>
         </header>
 
         {total > 0 && (

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ChevronRight, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { ChevronRight, CopyPlus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { api } from "@/lib/client-api";
 import { formatCents } from "@/lib/format";
 import type { ListSummary } from "@/lib/types";
@@ -33,6 +33,18 @@ export function ListsView({ initialLists }: { initialLists: ListSummary[] }) {
       router.push(`/lists/${list.id}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Couldn't create list");
+      setCreating(false);
+    }
+  }
+
+  async function copy(list: ListSummary) {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const copied = await api.copyList(list.id);
+      router.push(`/lists/${copied.id}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't copy list");
       setCreating(false);
     }
   }
@@ -98,6 +110,14 @@ export function ListsView({ initialLists }: { initialLists: ListSummary[] }) {
                 </div>
                 <ChevronRight aria-hidden className="size-4 text-muted" />
               </Link>
+              <IconButton
+                label={`Make a copy of ${list.name}`}
+                onClick={() => copy(list)}
+                disabled={creating}
+                className="text-muted"
+              >
+                <CopyPlus aria-hidden className="size-4" />
+              </IconButton>
               <IconButton
                 label={`Delete ${list.name}`}
                 onClick={() => remove(list)}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ChevronRight, Plus, Trash2, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, CopyPlus, Plus, Trash2, UtensilsCrossed } from "lucide-react";
 import { api } from "@/lib/client-api";
 import { formatCents } from "@/lib/format";
 import type { MealSummary } from "@/lib/types";
@@ -33,6 +33,18 @@ export function MealsView({ initialMeals }: { initialMeals: MealSummary[] }) {
       router.push(`/meals/${meal.id}`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Couldn't create meal");
+      setCreating(false);
+    }
+  }
+
+  async function copy(meal: MealSummary) {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const copied = await api.copyMeal(meal.id);
+      router.push(`/meals/${copied.id}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't copy meal");
       setCreating(false);
     }
   }
@@ -98,6 +110,14 @@ export function MealsView({ initialMeals }: { initialMeals: MealSummary[] }) {
                 </div>
                 <ChevronRight aria-hidden className="size-4 text-muted" />
               </Link>
+              <IconButton
+                label={`Make a copy of ${meal.name}`}
+                onClick={() => copy(meal)}
+                disabled={creating}
+                className="text-muted"
+              >
+                <CopyPlus aria-hidden className="size-4" />
+              </IconButton>
               <IconButton
                 label={`Delete ${meal.name}`}
                 onClick={() => remove(meal)}

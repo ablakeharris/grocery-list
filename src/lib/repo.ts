@@ -114,6 +114,61 @@ export function deleteList(id: string): boolean {
   return result.changes > 0;
 }
 
+const MAX_NAME = 60;
+
+/**
+ * Picks a free name for a copy: "Weekly" → "Weekly (copy)", then
+ * "Weekly (copy 2)" and so on. Copying a copy counts up from the original.
+ */
+function copyName(table: "lists" | "meals", name: string): string {
+  const base = name.replace(/ \(copy(?: \d+)?\)$/, "");
+  const taken = new Set(
+    (getDb().prepare(`SELECT name FROM ${table}`).all() as Row[]).map((r) =>
+      String(r.name).toLowerCase(),
+    ),
+  );
+  for (let n = 1; ; n++) {
+    const suffix = n === 1 ? " (copy)" : ` (copy ${n})`;
+    const candidate = base.slice(0, MAX_NAME - suffix.length).trimEnd() + suffix;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+/**
+ * Makes a new list with the same items. Items start unchecked so the copy is
+ * ready for another trip. Returns null when the list doesn't exist.
+ */
+export function copyList(id: string): List | null {
+  const source = getList(id);
+  if (!source) return null;
+  const db = getDb();
+  const newId = randomUUID();
+  const now = nowIso();
+  transaction(db, () => {
+    db.prepare(
+      "INSERT INTO lists (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+    ).run(newId, copyName("lists", source.name), now, now);
+    const insert = db.prepare(
+      `INSERT INTO items (id, list_id, name, size, quantity, price_cents, category, is_sample, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const item of getItems(id)) {
+      insert.run(
+        randomUUID(),
+        newId,
+        item.name,
+        item.size,
+        item.quantity,
+        item.priceCents,
+        item.category,
+        Number(item.isSample),
+        item.createdAt,
+      );
+    }
+  });
+  return getList(newId);
+}
+
 // ---- Items ----
 
 export function getItems(listId: string): Item[] {
@@ -290,6 +345,37 @@ export function renameMeal(id: string, name: string): Meal | null {
 export function deleteMeal(id: string): boolean {
   const result = getDb().prepare("DELETE FROM meals WHERE id = ?").run(id);
   return result.changes > 0;
+}
+
+/** Makes a new meal with the same ingredients. Returns null when the meal doesn't exist. */
+export function copyMeal(id: string): Meal | null {
+  const source = getMeal(id);
+  if (!source) return null;
+  const db = getDb();
+  const newId = randomUUID();
+  const now = nowIso();
+  transaction(db, () => {
+    db.prepare(
+      "INSERT INTO meals (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+    ).run(newId, copyName("meals", source.name), now, now);
+    const insert = db.prepare(
+      `INSERT INTO meal_ingredients (id, meal_id, name, size, quantity, price_cents, category, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const ing of getIngredients(id)) {
+      insert.run(
+        randomUUID(),
+        newId,
+        ing.name,
+        ing.size,
+        ing.quantity,
+        ing.priceCents,
+        ing.category,
+        ing.createdAt,
+      );
+    }
+  });
+  return getMeal(newId);
 }
 
 // ---- Ingredients ----

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Pencil, Printer, Send, Share2, Trash2, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, CopyPlus, Pencil, Printer, Send, Share2, Trash2, UtensilsCrossed } from "lucide-react";
 import { api, ApiError } from "@/lib/client-api";
 import { formatCents, lineTotalCents } from "@/lib/format";
 import type { ItemCreate, ItemUpdate } from "@/lib/schema";
@@ -19,6 +20,7 @@ import { useToast } from "./toast";
 type Props = { initialList: List; initialItems: Item[] };
 
 export function ListView({ initialList, initialItems }: Props) {
+  const router = useRouter();
   const [list, setList] = useState(initialList);
   const [items, setItems] = useState(initialItems);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -26,6 +28,7 @@ export function ListView({ initialList, initialItems }: Props) {
   const [pickingMeal, setPickingMeal] = useState(false);
   const [sending, setSending] = useState(false);
   const [gone, setGone] = useState(false);
+  const [copying, setCopying] = useState(false);
   const { toast, showToast } = useToast();
   // Skip background refreshes while our own changes are in flight,
   // so the server's older copy doesn't overwrite the optimistic update.
@@ -137,6 +140,17 @@ export function ListView({ initialList, initialItems }: Props) {
     }
   }
 
+  async function copy() {
+    setCopying(true);
+    try {
+      const copied = await api.copyList(list.id);
+      router.push(`/lists/${copied.id}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't copy list");
+      setCopying(false);
+    }
+  }
+
   async function share() {
     const result = await shareText(list.name, listToText(list.name, items));
     if (result === "copied") showToast("List copied to clipboard");
@@ -219,6 +233,9 @@ export function ListView({ initialList, initialItems }: Props) {
             </IconButton>
             <IconButton label="Share list" onClick={share}>
               <Share2 aria-hidden className="size-[18px]" />
+            </IconButton>
+            <IconButton label="Make a copy" onClick={copy} disabled={copying}>
+              <CopyPlus aria-hidden className="size-[18px]" />
             </IconButton>
             <IconButton label="Print list" onClick={() => window.print()}>
               <Printer aria-hidden className="size-[18px]" />

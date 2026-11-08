@@ -50,6 +50,7 @@ export const api = {
     request<List>(`/api/lists/${id}`, json("PATCH", { name })),
   deleteList: (id: string) =>
     request<void>(`/api/lists/${id}`, { method: "DELETE" }),
+  copyList: (id: string) => request<List>(`/api/lists/${id}/copy`, { method: "POST" }),
   listWithItems: (id: string) =>
     request<{ list: List; items: Item[] }>(`/api/lists/${id}`),
 
@@ -70,6 +71,7 @@ export const api = {
     request<Meal>(`/api/meals/${id}`, json("PATCH", { name })),
   deleteMeal: (id: string) =>
     request<void>(`/api/meals/${id}`, { method: "DELETE" }),
+  copyMeal: (id: string) => request<Meal>(`/api/meals/${id}/copy`, { method: "POST" }),
   mealWithIngredients: (id: string) =>
     request<{ meal: Meal; ingredients: Ingredient[] }>(`/api/meals/${id}`),
 
