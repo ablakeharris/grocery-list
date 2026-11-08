@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { api } from "@/lib/client-api";
-import { productLabel, tidyBrand } from "@/lib/format";
 import type { FoodSuggestion } from "@/lib/types";
 
 const DEBOUNCE_MS = 150;
@@ -16,7 +15,7 @@ type Props = {
   placeholder?: string;
 };
 
-/** Item name field that suggests products from the food catalog as you type. */
+/** Item name field that suggests generic items from the food catalog as you type. */
 export function FoodNameInput({
   value,
   onChange,
@@ -131,16 +130,14 @@ export function FoodNameInput({
         <ul
           id={listId}
           role="listbox"
-          aria-label="Suggested products"
+          aria-label="Suggested items"
           className="absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-y-auto rounded-xl border border-line bg-card py-1 shadow-lg"
         >
           {suggestions.map((product, i) => {
-            const details = [product.brand && tidyBrand(product.brand), product.quantity]
-              .filter(Boolean)
-              .join(" · ");
+            const details = product.sizes.join(" · ");
             return (
               <li
-                key={product.code}
+                key={product.name}
                 id={`${listId}-${i}`}
                 role="option"
                 aria-selected={i === active}
@@ -148,7 +145,6 @@ export function FoodNameInput({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(product)}
                 onMouseEnter={() => setActive(i)}
-                title={productLabel(product)}
                 className={`flex cursor-pointer items-center gap-3 px-3 py-2 ${i === active ? "bg-soft" : ""}`}
               >
                 <span className="min-w-0 flex-1">

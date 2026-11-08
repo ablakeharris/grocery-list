@@ -4,15 +4,15 @@ import path from "node:path";
 import { CATEGORIES, type Category } from "./categories";
 import type { FoodSuggestion } from "./types";
 
-// Product catalog built by `npm run import-foods` from the Open Food Facts
+// Item catalog built by `npm run import-foods` from the Open Food Facts
 // parquet. Read-only, and optional: without it, suggestions are just empty.
 const FOODS_PATH =
   process.env.FOODS_DATABASE_PATH ?? path.join(/*turbopackIgnore: true*/ process.cwd(), "data", "foods.db");
 
-// How many matches (in popularity order) to re-rank before picking the top few.
+// How many matches (in rank order) to re-rank before picking the top few.
 const CANDIDATES = 200;
 
-type Catalog = { db: DatabaseSync; search: StatementSync; mtimeMs: number };
+type Catalog = { db: DatabaseSync; search: StatementSync | null; mtimeMs: number };
 
 const globalForFoods = globalThis as unknown as { foodsCatalog?: Catalog | null };
 
@@ -31,14 +31,20 @@ function openCatalog(): Catalog | null {
   current?.db.close();
 
   const db = new DatabaseSync(FOODS_PATH, { readOnly: true });
-  const search = db.prepare(`
-    SELECT f.id, f.code, f.name, f.brand, f.quantity, f.category
-      FROM foods_fts
-      JOIN foods f ON f.id = foods_fts.rowid
-     WHERE foods_fts MATCH ?
-     ORDER BY foods_fts.rowid
-     LIMIT ${CANDIDATES}
-  `);
+  const hasItems = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'items_fts'").get();
+  if (!hasItems) {
+    console.warn(`${FOODS_PATH} is from an older import; re-run "npm run import-foods" for suggestions.`);
+  }
+  const search = hasItems
+    ? db.prepare(`
+        SELECT i.name, i.sizes, i.category
+          FROM items_fts
+          JOIN items i ON i.id = items_fts.rowid
+         WHERE items_fts MATCH ?
+         ORDER BY items_fts.rowid
+         LIMIT ${CANDIDATES}
+      `)
+    : null;
   globalForFoods.foodsCatalog = { db, search, mtimeMs };
   return globalForFoods.foodsCatalog;
 }
@@ -54,39 +60,50 @@ function toCategory(value: unknown): Category | null {
     : null;
 }
 
+function toSizes(value: unknown): string[] {
+  try {
+    const sizes: unknown = JSON.parse(String(value));
+    return Array.isArray(sizes) ? sizes.filter((s) => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Products matching every word of `query` as a prefix, e.g. "pea butt" finds
- * "Creamy Peanut Butter". Name matches beat brand-only matches; ties keep
- * popularity order.
+ * Items matching every word of `query` as a prefix, e.g. "pea butt" finds
+ * "Creamy Peanut Butter". Names that are, or end with, the query come first
+ * ("milk" → "Whole Milk" before "Milk Chocolate"); ties keep rank order.
  */
 export function searchFoods(query: string, limit = 8): FoodSuggestion[] {
   const terms = words(query).slice(0, 6);
   if (terms.length === 0 || terms.join("").length < 2) return [];
 
-  const catalog = openCatalog();
-  if (!catalog) return [];
+  const search = openCatalog()?.search;
+  if (!search) return [];
 
   const match = terms.map((t) => `"${t}"*`).join(" ");
-  const rows = catalog.search.all(match) as Record<string, unknown>[];
+  const rows = search.all(match) as Record<string, unknown>[];
 
   const phrase = terms.join(" ");
-  const scored = rows.map((row, popularity) => {
+  const scored = rows.map((row, rank) => {
     const name = words(String(row.name));
     const nameText = name.join(" ");
     let score = 0;
-    if (nameText === phrase) score += 6;
+    if (nameText === phrase) score += 10;
+    // In English the last word is usually what the thing is: "Whole Milk"
+    // beats "Milk Chocolate".
+    else if (nameText.endsWith(phrase)) score += 5;
     else if (nameText.startsWith(phrase)) score += 4;
     else if (` ${nameText}`.includes(` ${phrase}`)) score += 2;
-    if (terms.every((t) => name.some((w) => w.startsWith(t)))) score += 2;
-    return { row, score, popularity };
+    // A nudge toward shorter, more generic names; popularity still matters more.
+    score -= 0.25 * Math.max(0, name.length - terms.length);
+    return { row, score, rank };
   });
-  scored.sort((a, b) => b.score - a.score || a.popularity - b.popularity);
+  scored.sort((a, b) => b.score - a.score || a.rank - b.rank);
 
   return scored.slice(0, limit).map(({ row }) => ({
-    code: String(row.code),
     name: String(row.name),
-    brand: row.brand === null ? null : String(row.brand),
-    quantity: row.quantity === null ? null : String(row.quantity),
+    sizes: toSizes(row.sizes),
     category: toCategory(row.category),
   }));
 }

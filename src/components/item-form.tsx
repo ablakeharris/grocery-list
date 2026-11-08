@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "@/lib/categories";
-import { centsToInput, parseDollars, productLabel } from "@/lib/format";
+import { centsToInput, parseDollars } from "@/lib/format";
 import type { ItemCreate } from "@/lib/schema";
 import { FoodNameInput } from "./food-name-input";
 
@@ -28,11 +28,14 @@ export function ItemForm({
   onCancel,
 }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
+  const [size, setSize] = useState(initial?.size ?? "");
   const [quantity, setQuantity] = useState(String(initial?.quantity ?? 1));
   const [price, setPrice] = useState(centsToInput(initial?.priceCents ?? null));
   const [category, setCategory] = useState<Category>(
     initial?.category ?? DEFAULT_CATEGORY,
   );
+  // Package sizes of the last picked suggestion, offered as chips.
+  const [sizes, setSizes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const isEdit = initial !== undefined;
 
@@ -50,12 +53,14 @@ export function ItemForm({
       return;
     }
     setError(null);
-    onSubmit({ name: trimmed, quantity: qty, priceCents, category });
+    onSubmit({ name: trimmed, size: size.trim() || null, quantity: qty, priceCents, category });
     if (!isEdit) {
       // Keep the category: people tend to add several items from the same aisle.
       setName("");
+      setSize("");
       setQuantity("1");
       setPrice("");
+      setSizes([]);
     }
   }
 
@@ -66,13 +71,41 @@ export function ItemForm({
         value={name}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        onChange={setName}
+        onChange={(value) => {
+          setName(value);
+          if (value.trim() === "") setSizes([]);
+        }}
         onPick={(product) => {
-          setName(productLabel(product));
+          setName(product.name);
+          setSizes(product.sizes);
+          setSize("");
           if (product.category) setCategory(product.category);
           setError(null);
         }}
       />
+      {sizes.length > 0 && (
+        <div role="group" aria-label="Package size" className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-xs text-muted">Size</span>
+          {sizes.map((option) => {
+            const on = option === size.trim();
+            return (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setSize(on ? "" : option)}
+                className={`h-7 rounded-full border px-3 text-[13px] transition ${
+                  on
+                    ? "border-accent bg-accent text-accent-ink"
+                    : "border-line bg-card text-ink hover:bg-soft"
+                }`}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <input
           className={`${fieldClass} w-16`}
@@ -83,6 +116,15 @@ export function ItemForm({
           aria-label="Quantity"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
+        />
+        <input
+          className={`${fieldClass} w-24`}
+          type="text"
+          placeholder="Size"
+          aria-label="Size"
+          maxLength={20}
+          value={size}
+          onChange={(e) => setSize(e.target.value)}
         />
         <div className="relative w-28">
           <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted">

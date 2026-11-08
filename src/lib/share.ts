@@ -16,7 +16,8 @@ export function listToText(name: string, items: Item[]): string {
     for (const item of group.items) {
       const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
       const box = item.checked ? "[x]" : "[ ]";
-      lines.push(`${box} ${item.name}${qty}`);
+      const size = item.size ? ` (${item.size})` : "";
+      lines.push(`${box} ${item.name}${size}${qty}`);
     }
   }
   const total = items.reduce((sum, i) => sum + lineTotalCents(i), 0);

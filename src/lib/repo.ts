@@ -40,6 +40,7 @@ function toItem(row: Row): Item {
     id: String(row.id),
     listId: String(row.list_id),
     name: String(row.name),
+    size: row.size === null ? null : String(row.size),
     quantity: Number(row.quantity),
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
     category: toCategory(row.category),
@@ -134,13 +135,14 @@ export function createItem(listId: string, input: ItemCreate): Item {
   transaction(getDb(), () => {
     getDb()
       .prepare(
-        `INSERT INTO items (id, list_id, name, quantity, price_cents, category, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO items (id, list_id, name, size, quantity, price_cents, category, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         listId,
         input.name,
+        input.size,
         input.quantity,
         input.priceCents,
         input.category,
@@ -153,6 +155,7 @@ export function createItem(listId: string, input: ItemCreate): Item {
 
 const UPDATE_COLUMNS = {
   name: "name",
+  size: "size",
   quantity: "quantity",
   priceCents: "price_cents",
   category: "category",
@@ -225,6 +228,7 @@ function toIngredient(row: Row): Ingredient {
     id: String(row.id),
     mealId: String(row.meal_id),
     name: String(row.name),
+    size: row.size === null ? null : String(row.size),
     quantity: Number(row.quantity),
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
     category: toCategory(row.category),
@@ -311,13 +315,14 @@ export function createIngredient(mealId: string, input: IngredientCreate): Ingre
   transaction(getDb(), () => {
     getDb()
       .prepare(
-        `INSERT INTO meal_ingredients (id, meal_id, name, quantity, price_cents, category, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO meal_ingredients (id, meal_id, name, size, quantity, price_cents, category, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         mealId,
         input.name,
+        input.size,
         input.quantity,
         input.priceCents,
         input.category,
@@ -330,6 +335,7 @@ export function createIngredient(mealId: string, input: IngredientCreate): Ingre
 
 const INGREDIENT_COLUMNS = {
   name: "name",
+  size: "size",
   quantity: "quantity",
   priceCents: "price_cents",
   category: "category",
@@ -373,13 +379,14 @@ export function deleteIngredient(id: string): boolean {
 
 // ---- Adding a meal to a list ----
 
-function nameKey(name: string) {
-  return name.trim().toLowerCase();
+/** Same name and size means same thing: 16 oz and 40 oz peanut butter stay separate. */
+function itemKey(item: { name: string; size: string | null }) {
+  return `${item.name.trim().toLowerCase()}\0${(item.size ?? "").trim().toLowerCase()}`;
 }
 
 /**
  * Copies a meal's ingredients onto a list, `times` batches over. An ingredient
- * that's already on the list and not yet bought gets its quantity bumped
+ * that's already on the list (same name and size) and not yet bought gets its quantity bumped
  * instead of a duplicate row, so two meals that both need onions give one
  * "Onions x2". Returns null when the meal doesn't exist.
  */
@@ -397,8 +404,8 @@ export function addMealToList(
   transaction(db, () => {
     const open = new Map<string, Item>();
     for (const item of getItems(listId)) {
-      if (!item.checked && !open.has(nameKey(item.name))) {
-        open.set(nameKey(item.name), item);
+      if (!item.checked && !open.has(itemKey(item))) {
+        open.set(itemKey(item), item);
       }
     }
 
@@ -406,15 +413,15 @@ export function addMealToList(
       "UPDATE items SET quantity = ?, price_cents = COALESCE(price_cents, ?), is_sample = 0 WHERE id = ?",
     );
     const insert = db.prepare(
-      `INSERT INTO items (id, list_id, name, quantity, price_cents, category, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO items (id, list_id, name, size, quantity, price_cents, category, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const base = Date.now();
     const createdIds = new Set<string>();
 
     ingredients.forEach((ing, i) => {
       const qty = ing.quantity * times;
-      const existing = open.get(nameKey(ing.name));
+      const existing = open.get(itemKey(ing));
       if (existing) {
         existing.quantity = Math.min(MAX_QUANTITY, existing.quantity + qty);
         bump.run(existing.quantity, ing.priceCents, existing.id);
@@ -424,6 +431,7 @@ export function addMealToList(
           id: randomUUID(),
           listId,
           name: ing.name,
+          size: ing.size,
           quantity: Math.min(MAX_QUANTITY, qty),
           priceCents: ing.priceCents,
           category: ing.category,
@@ -436,13 +444,14 @@ export function addMealToList(
           item.id,
           listId,
           item.name,
+          item.size,
           item.quantity,
           item.priceCents,
           item.category,
           item.createdAt,
         );
         // A meal that lists the same thing twice merges into one row.
-        open.set(nameKey(item.name), item);
+        open.set(itemKey(item), item);
         createdIds.add(item.id);
         added++;
       }

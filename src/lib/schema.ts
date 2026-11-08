@@ -5,16 +5,24 @@ const name = z.string().trim().min(1, "Name is required").max(100);
 const quantity = z.int().min(1).max(999);
 const priceCents = z.int().min(0).max(10_000_000).nullable();
 const category = z.enum(CATEGORIES);
+/** Package size, e.g. "16 oz". Blank means none. */
+const size = z
+  .string()
+  .trim()
+  .max(20)
+  .nullable()
+  .transform((s) => s || null);
 
 export const itemCreateSchema = z.object({
   name,
+  size: size.default(null),
   quantity: quantity.default(1),
   priceCents: priceCents.default(null),
   category: category.default("Other"),
 });
 
 export const itemUpdateSchema = z
-  .object({ name, quantity, priceCents, category, checked: z.boolean() })
+  .object({ name, size, quantity, priceCents, category, checked: z.boolean() })
   .partial();
 
 export const listCreateSchema = z.object({

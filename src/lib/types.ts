@@ -17,6 +17,8 @@ export type Item = {
   id: string;
   listId: string;
   name: string;
+  /** Package size, e.g. "16 oz". Null when it doesn't matter. */
+  size: string | null;
   quantity: number;
   /** Price for a single unit, in cents. Null when unknown. */
   priceCents: number | null;
@@ -44,6 +46,8 @@ export type Ingredient = {
   id: string;
   mealId: string;
   name: string;
+  /** Package size, e.g. "16 oz". Null when it doesn't matter. */
+  size: string | null;
   quantity: number;
   /** Price for a single unit, in cents. Null when unknown. */
   priceCents: number | null;
@@ -60,14 +64,14 @@ export type AddMealResult = {
   items: Item[];
 };
 
-/** A product from the Open Food Facts catalog, offered while typing an item name. */
+/**
+ * A generic item from the catalog (many brands' products merged into one),
+ * offered while typing an item name.
+ */
 export type FoodSuggestion = {
-  /** Barcode. */
-  code: string;
   name: string;
-  brand: string | null;
-  /** Package size as printed, e.g. "16 oz". */
-  quantity: string | null;
+  /** Package sizes it's commonly sold in, smallest first, e.g. ["16 oz", "28 oz"]. */
+  sizes: string[];
   /** Null when the catalog doesn't know which aisle it belongs in. */
   category: Category | null;
 };

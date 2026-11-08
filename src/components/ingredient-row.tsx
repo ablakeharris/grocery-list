@@ -52,6 +52,7 @@ export function IngredientRow({
         className="min-w-0 flex-1 truncate text-left text-[15px] text-ink"
       >
         {ingredient.name}
+        {ingredient.size && <span className="ml-1.5 text-sm text-muted">{ingredient.size}</span>}
       </button>
 
       {ingredient.quantity > 1 && (

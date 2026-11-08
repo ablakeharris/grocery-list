@@ -87,6 +87,15 @@ const MIGRATIONS: ((db: DatabaseSync) => void)[] = [
       CREATE INDEX meal_ingredients_meal_id ON meal_ingredients(meal_id);
     `);
   },
+  (db) => {
+    // Package size, e.g. "16 oz" or "12 ct". Null when it doesn't matter.
+    db.exec(`
+      ALTER TABLE items ADD COLUMN size TEXT;
+      ALTER TABLE meal_ingredients ADD COLUMN size TEXT;
+    `);
+    const setSize = db.prepare("UPDATE items SET size = ? WHERE is_sample = 1 AND name = ?");
+    for (const [name, size] of SAMPLE_SIZES) setSize.run(size, name);
+  },
 ];
 
 function migrate(db: DatabaseSync) {
@@ -112,6 +121,16 @@ const SAMPLE_ITEMS: [name: string, qty: number, cents: number, category: string]
   ["Olive Oil", 1, 799, "Pantry"],
   ["Rice", 1, 349, "Pantry"],
   ["Tortilla Chips", 1, 379, "Snacks"],
+];
+
+const SAMPLE_SIZES: [name: string, size: string][] = [
+  ["Spinach", "10 oz"],
+  ["Greek Yogurt", "32 oz"],
+  ["Milk", "1 gal"],
+  ["Chicken Breast", "16 oz"],
+  ["Olive Oil", "16.9 fl oz"],
+  ["Rice", "2 lb"],
+  ["Tortilla Chips", "13 oz"],
 ];
 
 // Runs once, on first start, so a new install has something to look at.

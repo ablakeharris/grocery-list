@@ -5,8 +5,8 @@ A small self-hosted app for shared grocery lists, built to run on a Raspberry Pi
 - Multiple lists, items grouped by category, with quantity, price and an estimated total
 - Tap the checkbox to mark an item bought (it stays in place, crossed out)
 - Tap an item's name to edit it; tap the list title to rename the list
-- Product suggestions while typing an item name, from the [Open Food Facts](https://world.openfoodfacts.org) database (optional, see below)
-- Meals: save the ingredients for meals you make often, then add a meal to a list from the list page (the fork-and-knife button). Ingredients already on the list, and not yet checked off, get their quantity bumped instead of being added twice; add a meal twice to double it
+- Item suggestions while typing an item name, with the package sizes each item is sold in, from the [Open Food Facts](https://world.openfoodfacts.org) database (optional, see below)
+- Meals: save the ingredients for meals you make often, then add a meal to a list from the list page (the fork-and-knife button). Ingredients already on the list with the same name and size, and not yet checked off, get their quantity bumped instead of being added twice; add a meal twice to double it
 - Share (phone share sheet or copy to clipboard), print, clear checked, clear all
 - Open devices refresh every 10 seconds and when the tab regains focus
 - No login: anyone on your network can use it
@@ -54,15 +54,15 @@ docker cp grocery-list:/data/backup.db ./grocery-backup-$(date +%F).db
 
 Restore by stopping the container, copying a backup over `/data/grocery.db` (for example with a temporary container that mounts the volume), and starting it again.
 
-`foods.db` (product suggestions, see below) sits next to it in the same volume. It isn't user data, so there's no need to back it up.
+`foods.db` (item suggestions, see below) sits next to it in the same volume. It isn't user data, so there's no need to back it up.
 
 On first start the app creates a sample list, which you can clear with the "Clear sample" button.
 
-## Product suggestions (Open Food Facts)
+## Item suggestions (Open Food Facts)
 
-Typing an item name suggests matching products, such as "pea butt" → "Jif Creamy Peanut Butter". Picking one fills in the name and, when known, the category. The suggestions come from the [Open Food Facts product database](https://huggingface.co/datasets/openfoodfacts/product-database) (licensed [ODbL](https://opendatacommons.org/licenses/odbl/1-0/)).
+Typing an item name suggests generic items, such as "pea butt" → "Peanut Butter", with the sizes it's commonly sold in (12 oz, 16 oz, 28 oz, 40 oz). Brands are left out. Picking one fills in the name and, when known, the category, and shows the sizes as buttons; tapping one fills in the item's Size field. Items and meal ingredients have their own size, so adding a meal only merges with a list item of the same name and size. The suggestions come from the [Open Food Facts product database](https://huggingface.co/datasets/openfoodfacts/product-database) (licensed [ODbL](https://opendatacommons.org/licenses/odbl/1-0/)).
 
-The full export is a 7+ GB parquet file, too big to search on a Pi. So an import script uses [DuckDB](https://duckdb.org) to turn it into a small SQLite catalog (`data/foods.db`, about 115 MB, ~760k products) with a full-text index, and the app only reads that. DuckDB is a dev dependency; it never runs on the Pi. Without the catalog the app works the same, just without suggestions.
+The full export is a 7+ GB parquet file, too big to search on a Pi. So an import script uses [DuckDB](https://duckdb.org) to turn it into a small SQLite catalog (`data/foods.db`, about 17 MB, ~160k items) with a full-text index, and the app only reads that. DuckDB is a dev dependency; it never runs on the Pi. Without the catalog the app works the same, just without suggestions.
 
 Build the catalog on your computer (it takes under a minute):
 
@@ -72,7 +72,7 @@ npm run import-foods
 # Options: --input food.parquet --output data/foods.db --country en:united-states
 ```
 
-It keeps products sold in the chosen country, ranks them by how often they're scanned there, and merges duplicates. Re-run it whenever you download a newer export; a running app picks up the new file automatically.
+It keeps products sold in the chosen country, strips brand names (and sizes or barcodes) out of product names, and merges products that end up with the same name into one item. Each item keeps its most common package sizes, ignoring sizes that are really a serving size. Items are ranked by how often they're scanned there and how many brands sell them. Re-run it whenever you download a newer export; a running app picks up the new file automatically.
 
 Copy it to the Pi's data volume:
 
@@ -100,10 +100,10 @@ npm run build
 |---|---|---|
 | GET / POST | `/api/lists` | List all lists (with counts and totals) / create `{ name }` |
 | GET / PATCH / DELETE | `/api/lists/:id` | List with items / rename `{ name }` / delete |
-| GET / POST | `/api/lists/:id/items` | Items / add `{ name, quantity?, priceCents?, category? }` |
+| GET / POST | `/api/lists/:id/items` | Items / add `{ name, size?, quantity?, priceCents?, category? }` |
 | DELETE | `/api/lists/:id/items?scope=all\|checked\|sample` | Clear items |
-| PATCH / DELETE | `/api/items/:id` | Update `{ name?, quantity?, priceCents?, category?, checked? }` / delete |
-| GET | `/api/foods?q=` | Product suggestions: `[{ code, name, brand, quantity, category }]` |
+| PATCH / DELETE | `/api/items/:id` | Update `{ name?, size?, quantity?, priceCents?, category?, checked? }` / delete |
+| GET | `/api/foods?q=` | Item suggestions: `[{ name, sizes, category }]` |
 | GET | `/api/health` | Health check used by Docker |
 
 ## Layout
@@ -114,7 +114,7 @@ src/
   components/          client UI (list-view, item-row, item-form, lists-view, ...)
   lib/
     db.ts              SQLite connection and schema migrations
-    foods.ts           product search over the Open Food Facts catalog
+    foods.ts           item search over the Open Food Facts catalog
     repo.ts            all database queries
     schema.ts          Zod input validation
     categories.ts      category names and display order

@@ -72,6 +72,7 @@ export function ItemRow({
         }`}
       >
         {item.name}
+        {item.size && <span className="ml-1.5 text-sm text-muted">{item.size}</span>}
       </button>
 
       {item.quantity > 1 && (
