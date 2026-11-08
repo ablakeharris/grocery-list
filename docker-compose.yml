@@ -1,0 +1,13 @@
+services:
+  grocery:
+    build: .
+    image: grocery-list:latest
+    container_name: grocery-list
+    ports:
+      - "3000:3000"
+    volumes:
+      - grocery-data:/data
+    restart: unless-stopped
+
+volumes:
+  grocery-data:
