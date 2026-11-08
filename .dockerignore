@@ -2,8 +2,11 @@ node_modules
 .next
 .git
 data
+scripts
 *.db
 *.db-*
+*.parquet
+*.tmp
 npm-debug.log*
 .env*
 Dockerfile

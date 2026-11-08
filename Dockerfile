@@ -24,7 +24,8 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    DATABASE_PATH=/data/grocery.db
+    DATABASE_PATH=/data/grocery.db \
+    FOODS_DATABASE_PATH=/data/foods.db
 
 # Empty, node-owned /data for the volume. Copied (not RUN) so cross-building
 # for arm64 needs no CPU emulation.

@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /data
+
+# Open Food Facts export (multi-GB); see "Product suggestions" in README
+*.parquet

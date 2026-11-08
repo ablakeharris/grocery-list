@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "import-foods": "node scripts/import-foods.mts"
   },
   "dependencies": {
     "lucide-react": "^1.70.0",
@@ -17,6 +18,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@duckdb/node-api": "^2.0.0-r.1",
     "@tailwindcss/turbopack": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

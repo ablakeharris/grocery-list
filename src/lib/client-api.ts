@@ -1,5 +1,5 @@
 import type { ClearScope, ItemCreate, ItemUpdate } from "./schema";
-import type { Item, List, ListSummary } from "./types";
+import type { FoodSuggestion, Item, List, ListSummary } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -48,4 +48,7 @@ export const api = {
     request<{ deleted: number }>(`/api/lists/${listId}/items?scope=${scope}`, {
       method: "DELETE",
     }),
+
+  searchFoods: (q: string, signal?: AbortSignal) =>
+    request<FoodSuggestion[]>(`/api/foods?q=${encodeURIComponent(q)}`, { signal }),
 };

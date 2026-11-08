@@ -3,8 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { CATEGORIES, DEFAULT_CATEGORY, type Category } from "@/lib/categories";
-import { centsToInput, parseDollars } from "@/lib/format";
+import { centsToInput, parseDollars, productLabel } from "@/lib/format";
 import type { ItemCreate } from "@/lib/schema";
+import { FoodNameInput } from "./food-name-input";
 
 export const fieldClass =
   "h-10 rounded-lg border border-line bg-card px-3 text-[15px] text-ink placeholder:text-muted outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20";
@@ -58,15 +59,16 @@ export function ItemForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2" noValidate>
-      <input
-        className={`${fieldClass} w-full`}
-        placeholder="Add an item..."
-        aria-label="Item name"
+      <FoodNameInput
+        className={fieldClass}
         value={name}
-        maxLength={100}
         autoFocus={autoFocus}
-        enterKeyHint="done"
-        onChange={(e) => setName(e.target.value)}
+        onChange={setName}
+        onPick={(product) => {
+          setName(productLabel(product));
+          if (product.category) setCategory(product.category);
+          setError(null);
+        }}
       />
       <div className="flex flex-wrap gap-2">
         <input

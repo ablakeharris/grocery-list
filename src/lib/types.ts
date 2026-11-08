@@ -25,3 +25,15 @@ export type Item = {
   isSample: boolean;
   createdAt: string;
 };
+
+/** A product from the Open Food Facts catalog, offered while typing an item name. */
+export type FoodSuggestion = {
+  /** Barcode. */
+  code: string;
+  name: string;
+  brand: string | null;
+  /** Package size as printed, e.g. "16 oz". */
+  quantity: string | null;
+  /** Null when the catalog doesn't know which aisle it belongs in. */
+  category: Category | null;
+};
