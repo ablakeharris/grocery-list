@@ -58,3 +58,17 @@ export async function shareText(title: string, text: string): Promise<"shared" |
   area.remove();
   return ok ? "copied" : "failed";
 }
+
+/**
+ * Link that opens the Messages app with the text filled in.
+ * "?&body=" works on both iPhone (which wants "&") and Android (which wants "?").
+ */
+export function smsLink(phone: string, text: string): string {
+  return `sms:${phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(text)}`;
+}
+
+/** Link that opens the email app with the subject and body filled in. */
+export function mailtoLink(email: string, subject: string, text: string): string {
+  const body = text.replace(/\n/g, "\r\n");
+  return `mailto:${email.trim()}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}

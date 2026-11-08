@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Pencil, Printer, Share2, Trash2, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, Pencil, Printer, Send, Share2, Trash2, UtensilsCrossed } from "lucide-react";
 import { api, ApiError } from "@/lib/client-api";
 import { formatCents, lineTotalCents } from "@/lib/format";
 import type { ItemCreate, ItemUpdate } from "@/lib/schema";
@@ -12,6 +12,7 @@ import { IconButton } from "./icon-button";
 import { fieldClass, ItemForm } from "./item-form";
 import { ItemRow } from "./item-row";
 import { MealPicker } from "./meal-picker";
+import { SendToMe } from "./send-to-me";
 import { useLiveRefresh } from "./use-live-refresh";
 import { useToast } from "./toast";
 
@@ -23,6 +24,7 @@ export function ListView({ initialList, initialItems }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [pickingMeal, setPickingMeal] = useState(false);
+  const [sending, setSending] = useState(false);
   const [gone, setGone] = useState(false);
   const { toast, showToast } = useToast();
   // Skip background refreshes while our own changes are in flight,
@@ -207,6 +209,14 @@ export function ListView({ initialList, initialItems }: Props) {
             >
               <UtensilsCrossed aria-hidden className="size-[18px]" />
             </IconButton>
+            <IconButton
+              label="Text or email to me"
+              onClick={() => setSending((open) => !open)}
+              aria-expanded={sending}
+              className={sending ? "bg-soft text-ink" : ""}
+            >
+              <Send aria-hidden className="size-[18px]" />
+            </IconButton>
             <IconButton label="Share list" onClick={share}>
               <Share2 aria-hidden className="size-[18px]" />
             </IconButton>
@@ -234,6 +244,14 @@ export function ListView({ initialList, initialItems }: Props) {
 
         {pickingMeal && (
           <MealPicker onAdd={addMeal} onClose={() => setPickingMeal(false)} />
+        )}
+
+        {sending && (
+          <SendToMe
+            listName={list.name}
+            text={listToText(list.name, items)}
+            onClose={() => setSending(false)}
+          />
         )}
 
         {hasSample && (
